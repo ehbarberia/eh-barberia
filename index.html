@@ -7,14 +7,24 @@
   <meta name="theme-color" content="#000000">
   <title>EH Barbería - Reservas</title>
 
-  <link rel="icon" type="image/png" href="img/logo.png">
-  <link rel="apple-touch-icon" href="img/logo.png">
+  <!-- Ícono de la pestaña y de la app instalada en el celular -->
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="EH Barbería">
 
   <!-- Vista previa al compartir el link (WhatsApp, Facebook, etc.). Debe ser URL completa y pública. -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="EH Barbería">
   <meta property="og:description" content="Reserva tu cita en EH Barbería: elige tu corte, el día y la hora en segundos.">
-  <meta property="og:image" content="https://ehbarberia.github.io/eh-barberia/img/banner-fondo.jpg">
+  <meta property="og:image" content="https://ehbarberia.github.io/eh-barberia/img/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Logo de EH Barbería">
   <meta property="og:url" content="https://ehbarberia.github.io/eh-barberia/">
   <meta name="twitter:card" content="summary_large_image">
 
@@ -127,28 +137,29 @@
     }
 
     /* ---------- Portada: el arco del logo, repetido en la foto (como los espejos del local) ---------- */
-    .hero { text-align: center; padding-top: 0.5rem; }
-    .hero-logo { width: min(230px, 62vw); height: auto; display: block; margin: 0 auto 1.4rem; }
+    .hero { text-align: center; padding-top: 1.2rem; }
+    .hero-logo { width: min(380px, 88vw); height: auto; display: block; margin: 0 auto; }
 
-    .hero-arco {
-      width: min(340px, 80vw);
-      aspect-ratio: 3 / 4;
-      margin: 0 auto;
-      padding: 7px;
-      border: 1px solid var(--blanco);
-      border-radius: 999px 999px 16px 16px;
+    .btn-instalar {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-top: 1.4rem;
+      background: transparent;
+      color: var(--blanco);
+      border: 1px dashed var(--blanco);
+      border-radius: 999px;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
     }
-    .hero-arco img {
-      width: 100%; height: 100%;
-      object-fit: cover;
-      display: block;
-      border-radius: 999px 999px 11px 11px;
-      background: var(--carbon);
-    }
+    .btn-instalar:hover { background: var(--blanco); color: var(--negro); border-style: solid; }
+
+    .pasos-ios { padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.4rem; }
+    .pasos-ios i { width: 1.2em; text-align: center; }
 
     .hero-texto {
       max-width: 34rem;
-      margin: 1.6rem auto 1.6rem;
+      margin: 1.4rem auto 1.6rem;
       color: #d8d8d6;
       font-size: 1rem;
     }
@@ -641,9 +652,9 @@
 
       <div class="hero">
         <img class="hero-logo" src="img/logo.png" alt="EH Barbería, calidad garantizada">
-        <div class="hero-arco">
-          <img src="img/banner-fondo.jpg" alt="Interior de EH Barbería">
-        </div>
+        <button type="button" class="btn-instalar" id="btn-instalar" hidden>
+          <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i> Descargar la app en tu celular
+        </button>
         <p class="hero-texto">Cortes hechos con calma y con detalle. Elige tu corte, el día y la hora, y llega tranquilo: tu turno queda a tu nombre.</p>
       </div>
 
@@ -880,6 +891,32 @@
         <button type="submit" class="btn btn-danger">Bloquear</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- DIÁLOGO: INSTALAR EN IPHONE -->
+  <dialog id="dlg-ios" aria-labelledby="dlg-ios-titulo">
+    <h3 id="dlg-ios-titulo">Instala la app en tu iPhone</h3>
+    <ol class="pasos-ios">
+      <li>Abre esta página en <b>Safari</b>.</li>
+      <li>Toca el botón <b>Compartir</b> <i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> (abajo, o arriba en iPad).</li>
+      <li>Baja y elige <b>Agregar a pantalla de inicio</b> <i class="fa-regular fa-square-plus" aria-hidden="true"></i>.</li>
+      <li>Toca <b>Agregar</b>. El logo de EH Barbería queda con tus apps.</li>
+    </ol>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" id="btn-ios-cerrar">Cerrar</button>
+      <button type="button" class="btn" id="btn-ios-listo">Ya la agregué</button>
+    </div>
+  </dialog>
+
+  <!-- DIÁLOGO: YA TIENES UNA CITA -->
+  <dialog id="dlg-otra-cita" aria-labelledby="dlg-otra-titulo">
+    <h3 id="dlg-otra-titulo">Ya tienes una cita</h3>
+    <div id="dlg-otra-detalle" class="hint" style="color: var(--blanco);"></div>
+    <p class="hint">¿Quieres sacar otra cita además de esa?</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" id="btn-otra-no">No, dejar la mía</button>
+      <button type="button" class="btn" id="btn-otra-si">Sí, sacar otra</button>
+    </div>
   </dialog>
 
   <!-- VISOR DE FOTOS -->
@@ -1170,11 +1207,13 @@
         suscribirOcupados(cb) {
           const { fs, db } = fb;
           const q = fs.query(fs.collection(db, 'horarios'), fs.where('fecha', '>=', fechaLocal()));
-          return fs.onSnapshot(q,
+          // includeMetadataChanges: avisa si los datos vienen del servidor o de la memoria
+          // del celular (por ejemplo, al volver a la pestaña después de un rato).
+          return fs.onSnapshot(q, { includeMetadataChanges: true },
             snap => cb(snap.docs.map(d => {
               const { barberoId, fecha, hora } = d.data();
               return { barberoId, fecha, hora };
-            })),
+            }), !snap.metadata.fromCache),
             err => { console.error(err); avisar('No se pudo cargar la disponibilidad.', 'error'); }
           );
         },
@@ -1199,6 +1238,13 @@
             snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
             err => { console.error(err); avisar('No se pudieron cargar tus citas.', 'error'); }
           );
+        },
+
+        // Pregunta directo al servidor si la hora sigue libre (no a la memoria del celular).
+        async horaLibre(barberoId, fecha, hora) {
+          const { fs, db } = fb;
+          const s = await fs.getDocFromServer(fs.doc(db, 'horarios', slotId(barberoId, fecha, hora)));
+          return !s.exists();
         },
 
         async reservar(c) {
@@ -1329,7 +1375,8 @@
       misCitasLista: [],
       vista: 'cliente',
       reservaAbierta: false,
-      listo: false
+      listo: false,
+      ocupadosAlDia: false  // true cuando la disponibilidad ya llegó del servidor
     };
     let desuscribirCitas = null;
     let desuscribirPerfil = null;
@@ -1737,6 +1784,12 @@
       if (horas.length === 0) return sinHoras('Ese día no atendemos. Elige otra fecha.');
       if (diaBloqueado(barberoId, fecha)) return sinHoras(`${nombreBarbero(barberoId)} no atiende ese día. Elige otra fecha.`);
 
+      if (!estado.ocupadosAlDia) {
+        grid.appendChild(mensajeHorarios('Actualizando las horas disponibles…'));
+        $('datos-cliente-wrap').hidden = true;
+        return;
+      }
+
       const ocupadas = horasOcupadas(barberoId, fecha);
       if (estado.horaSel && ocupadas.has(estado.horaSel)) {
         estado.horaSel = '';
@@ -1754,7 +1807,7 @@
           const elegida = hora === estado.horaSel;
           btn.classList.toggle('selected', elegida);
           btn.setAttribute('aria-pressed', String(elegida));
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', async () => {
             estado.horaSel = hora;
             grid.querySelectorAll('.slot-btn').forEach(b => {
               b.classList.remove('selected');
@@ -1763,6 +1816,17 @@
             btn.classList.add('selected');
             btn.setAttribute('aria-pressed', 'true');
             $('datos-cliente-wrap').hidden = false;
+
+            // Doble revisión con el servidor: si otra persona la tomó hace un momento, se avisa ya.
+            let libre = true;
+            try { libre = await Store.horaLibre(barberoId, fecha, hora); } catch (e) { /* sin conexión: la reserva igual lo valida */ }
+            if (!libre && estado.horaSel === hora) {
+              estado.ocupados.push({ barberoId, fecha, hora });
+              estado.horaSel = '';
+              avisar('Esa hora ya está ocupada. Elige otra.', 'error');
+              renderDiaStrip();
+              renderHorarios();
+            }
           });
         }
         grid.appendChild(btn);
@@ -1804,6 +1868,37 @@
       box.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
+    function citasFuturasPropias() {
+      return estado.misCitasLista
+        .filter(c => !horaPasada(c.fecha, c.hora))
+        .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora));
+    }
+
+    // Letrero "Ya tienes una cita…": resuelve true si el cliente quiere sacar otra.
+    function confirmarOtraCita(futuras) {
+      const cont = $('dlg-otra-detalle');
+      cont.replaceChildren();
+      futuras.forEach(c => {
+        const serv = SERVICIOS[c.servicio] ? `, ${SERVICIOS[c.servicio].nombre}` : '';
+        cont.appendChild(el('p', null, `${formatoFechaLarga(c.fecha)}, ${formatoHora(c.hora)} con ${nombreBarbero(c.barberoId)}${serv}`));
+      });
+      $('dlg-otra-titulo').textContent = futuras.length === 1 ? 'Ya tienes una cita' : `Ya tienes ${futuras.length} citas`;
+      const dlg = $('dlg-otra-cita');
+      return new Promise(resolve => {
+        const cerrar = valor => {
+          $('btn-otra-si').onclick = null;
+          $('btn-otra-no').onclick = null;
+          dlg.onclose = null;
+          if (dlg.open) dlg.close();
+          resolve(valor);
+        };
+        $('btn-otra-si').onclick = () => cerrar(true);
+        $('btn-otra-no').onclick = () => cerrar(false);
+        dlg.onclose = () => cerrar(false); // tecla Escape = no
+        dlg.showModal();
+      });
+    }
+
     async function enviarReserva(e) {
       e.preventDefault();
 
@@ -1833,11 +1928,17 @@
         return avisar('Esa hora ya pasó. Elige otra.', 'error');
       }
 
+      const futuras = citasFuturasPropias();
+      if (futuras.length > 0 && !(await confirmarOtraCita(futuras))) {
+        avisar('Listo, tu cita sigue como estaba.');
+        return;
+      }
+
       const btn = $('btn-reservar');
       btn.disabled = true;
       estado.reservando = true;
       try {
-        const cita = { clienteNombre: nombre, clienteTelefono: telefono, barberoId, servicio, fecha, hora, uid: estado.usuario.uid };
+        const cita = { clienteNombre: nombre, clienteTelefono: telefono, clienteEmail: estado.usuario.email, barberoId, servicio, fecha, hora, uid: estado.usuario.uid };
         const citaId = await Store.reservar(cita);
         avisarConfirmacionInstantanea(citaId);
         estado.horaSel = '';
@@ -2338,6 +2439,60 @@
     }
 
     /* =====================================================================
+       INSTALAR LA APP (Android: ventana de instalación; iPhone: instrucciones)
+       El botón se oculta cuando la app ya está instalada o abierta como app.
+       ===================================================================== */
+    let promptInstalacion = null;
+    const CLAVE_INSTALADA = 'eh_app_instalada';
+    const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const enModoApp = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+    function marcaInstalada(valor) {
+      try {
+        if (valor === undefined) return localStorage.getItem(CLAVE_INSTALADA) === '1';
+        if (valor) localStorage.setItem(CLAVE_INSTALADA, '1'); else localStorage.removeItem(CLAVE_INSTALADA);
+      } catch (e) { /* sin almacenamiento: se muestra el botón */ }
+      return false;
+    }
+
+    function actualizarBotonInstalar() {
+      const puede = !!promptInstalacion || esIOS;
+      $('btn-instalar').hidden = enModoApp() || marcaInstalada() || !puede;
+    }
+
+    window.addEventListener('beforeinstallprompt', ev => {
+      ev.preventDefault();
+      promptInstalacion = ev;
+      marcaInstalada(false); // si Android ofrece instalar, es que no está instalada
+      actualizarBotonInstalar();
+    });
+
+    window.addEventListener('appinstalled', () => {
+      promptInstalacion = null;
+      marcaInstalada(true);
+      actualizarBotonInstalar();
+      avisar('App instalada. Búscala con el logo de EH Barbería.');
+    });
+
+    async function instalarApp() {
+      if (promptInstalacion) {
+        promptInstalacion.prompt();
+        const { outcome } = await promptInstalacion.userChoice;
+        if (outcome === 'accepted') marcaInstalada(true);
+        promptInstalacion = null;
+        actualizarBotonInstalar();
+      } else if (esIOS) {
+        $('dlg-ios').showModal();
+      }
+    }
+
+    function registrarServiceWorker() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.error('Service worker:', err));
+      }
+    }
+
+    /* =====================================================================
        INICIO
        ===================================================================== */
     function conectarEventos() {
@@ -2413,6 +2568,20 @@
       $('btn-dia-cancelar').addEventListener('click', () => $('dlg-dia').close());
       $('dia-desde').addEventListener('change', () => { $('dia-hasta').min = $('dia-desde').value; });
       $('form-dia').addEventListener('submit', enviarBloqueoDia);
+
+      $('btn-instalar').addEventListener('click', instalarApp);
+      $('btn-ios-cerrar').addEventListener('click', () => $('dlg-ios').close());
+      $('btn-ios-listo').addEventListener('click', () => {
+        marcaInstalada(true);
+        $('dlg-ios').close();
+        actualizarBotonInstalar();
+      });
+
+      // Al volver a la página después de un rato, las horas se muestran solo cuando
+      // el servidor confirma la disponibilidad.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && estado.listo) renderHorarios();
+      });
     }
 
     async function iniciar() {
@@ -2424,6 +2593,8 @@
       $('filtro-fecha-barbero').value = fechaLocal();
 
       conectarEventos();
+      registrarServiceWorker();
+      actualizarBotonInstalar();
       preseleccionarBarbero();
       mostrarVista('cliente');
       actualizarReserva();
@@ -2444,8 +2615,9 @@
       }
       estado.listo = true;
 
-      Store.suscribirOcupados(lista => {
+      Store.suscribirOcupados((lista, delServidor) => {
         estado.ocupados = lista;
+        estado.ocupadosAlDia = delServidor;
         renderDiaStrip();
         renderHorarios();
       });
