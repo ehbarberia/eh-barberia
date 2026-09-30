@@ -843,6 +843,8 @@
         </div>
         <p class="hint" style="margin: 1rem 0 0.6rem;">Días de descanso próximos</p>
         <div class="chips" id="lista-dias-bloqueados"></div>
+        <p class="hint" style="margin: 1rem 0 0.6rem;">Días de descanso que abriste para trabajar</p>
+        <div class="chips" id="lista-dias-abiertos"></div>
       </div>
 
       <!-- CLIENTES -->
@@ -1028,11 +1030,13 @@
       barbero_1: {
         nombre: "Eimer",
         activo: true,
+        horarioDiaLibre: EIMER_ENTRE_SEMANA, // si abre su miércoles de descanso, atiende con este horario
         horario: { 0: EIMER_DOMINGO, 1: EIMER_ENTRE_SEMANA, 2: EIMER_ENTRE_SEMANA, 3: null, 4: EIMER_ENTRE_SEMANA, 5: EIMER_ENTRE_SEMANA, 6: EIMER_SABADO }
       },
       barbero_2: {
         nombre: "Adrián",
         activo: true,
+        horarioDiaLibre: ADRIAN_ENTRE_SEMANA, // si abre su martes de descanso, atiende con este horario
         horario: { 0: ADRIAN_DOMINGO, 1: ADRIAN_ENTRE_SEMANA, 2: null, 3: ADRIAN_ENTRE_SEMANA, 4: ADRIAN_ENTRE_SEMANA, 5: ADRIAN_ENTRE_SEMANA, 6: ADRIAN_SABADO }
       }
     };
@@ -1066,11 +1070,25 @@
 
     const horarioDe = barberoId => (BARBEROS[barberoId] && BARBEROS[barberoId].horario) || {};
 
+    // Día de descanso fijo del barbero (ej. Eimer los miércoles, Adrián los martes).
+    function esDescansoFijo(barberoId, fecha) {
+      if (!barberoId || !fecha) return false;
+      const dia = new Date(fecha + 'T12:00:00').getDay();
+      const libre = (BARBEROS[barberoId] || {}).horarioDiaLibre || [];
+      return !(horarioDe(barberoId)[dia] || []).length && libre.length > 0;
+    }
+
+    const diaAbierto = (barberoId, fecha) =>
+      estado.diasAbiertos.some(d => d.barberoId === barberoId && d.fecha === fecha);
+
     // Turnos de ese barbero en esa fecha. [] si no trabaja.
     function horasDelDia(barberoId, fecha) {
       if (!barberoId || !fecha) return [];
       const dia = new Date(fecha + 'T12:00:00').getDay();
-      return (horarioDe(barberoId)[dia] || []).slice();
+      const normal = horarioDe(barberoId)[dia] || [];
+      if (normal.length) return normal.slice();
+      if (esDescansoFijo(barberoId, fecha) && diaAbierto(barberoId, fecha)) return BARBEROS[barberoId].horarioDiaLibre.slice();
+      return [];
     }
 
     // "13:20" -> "1:20 p. m."
@@ -1258,6 +1276,29 @@
           );
         },
 
+        // Días de descanso fijo que el barbero decidió abrir. Público: los clientes deben verlos.
+        suscribirDiasAbiertos(cb) {
+          const { fs, db } = fb;
+          const q = fs.query(fs.collection(db, 'diasAbiertos'), fs.where('fecha', '>=', fechaLocal()));
+          return fs.onSnapshot(q,
+            snap => cb(snap.docs.map(d => {
+              const { barberoId, fecha } = d.data();
+              return { barberoId, fecha };
+            })),
+            err => { console.error(err); }
+          );
+        },
+
+        async abrirDia(barberoId, fecha) {
+          const { fs, db } = fb;
+          await fs.setDoc(fs.doc(db, 'diasAbiertos', diaId(barberoId, fecha)), { barberoId, fecha });
+        },
+
+        async cerrarDia(barberoId, fecha) {
+          const { fs, db } = fb;
+          await fs.deleteDoc(fs.doc(db, 'diasAbiertos', diaId(barberoId, fecha)));
+        },
+
         // Cada barbero trae SOLO sus citas (las reglas no dejan leer las del otro).
         suscribirCitas(cb, barberoId) {
           const { fs, db } = fb;
@@ -1396,6 +1437,7 @@
       citas: [],
       ocupados: [],
       diasBloqueados: [],
+      diasAbiertos: [],
       horaSel: '',
       modo: 'dia',
       resumenPeriodo: 'dia',
@@ -2185,6 +2227,7 @@
         const fecha = sumarDias(hoy, i);
         const d = new Date(fecha + 'T12:00:00');
         const cerrado = horasDelDia(yo, fecha).length === 0;
+        const descansoFijo = cerrado && esDescansoFijo(yo, fecha);
         const descanso = !cerrado && diaBloqueado(yo, fecha);
         const n = porFecha[fecha] || 0;
 
@@ -2198,7 +2241,7 @@
         btn.append(
           el('span', 'dia-card-abrev', i === 0 ? 'Hoy' : DIAS_ABREV[d.getDay()]),
           el('span', 'dia-card-num', String(d.getDate())),
-          el('span', 'dia-card-estado', cerrado ? 'Cerrado' : descanso ? 'Descanso' : `${n} cita${n === 1 ? '' : 's'}`)
+          el('span', 'dia-card-estado', descansoFijo ? 'Descansas' : cerrado ? 'Cerrado' : descanso ? 'Descanso' : `${n} cita${n === 1 ? '' : 's'}`)
         );
         btn.addEventListener('click', () => {
           $('filtro-fecha-barbero').value = fecha;
@@ -2230,6 +2273,7 @@
 
       renderAgendaStrip(todas);
       renderDiasBloqueados();
+      renderDiasAbiertos();
       renderResumen(todas);
       renderClientes(todas);
 
@@ -2250,7 +2294,16 @@
       cont.replaceChildren();
       avisos.forEach(d => cont.appendChild(tarjetaDiaBloqueado(d)));
 
-      if (lista.length === 0 && avisos.length === 0) {
+      let tarjetaDescanso = null;
+      if (estado.modo === 'dia') {
+        const fecha = $('filtro-fecha-barbero').value || hoy;
+        if (esDescansoFijo(estado.miBarberoId, fecha) && fecha >= hoy) {
+          tarjetaDescanso = tarjetaDescansoFijo(fecha);
+          cont.appendChild(tarjetaDescanso);
+        }
+      }
+
+      if (lista.length === 0 && avisos.length === 0 && !tarjetaDescanso) {
         cont.appendChild(el('p', 'empty-msg', estado.modo === 'dia' ? 'No tienes citas este día.' : 'No hay citas en esa fecha.'));
         return;
       }
@@ -2301,6 +2354,41 @@
       });
     }
 
+    function renderDiasAbiertos() {
+      const cont = $('lista-dias-abiertos');
+      cont.replaceChildren();
+      const hoy = fechaLocal();
+      const lista = estado.diasAbiertos
+        .filter(d => d.fecha >= hoy && d.barberoId === estado.miBarberoId)
+        .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+      if (lista.length === 0) {
+        cont.appendChild(el('p', 'hint', 'Para trabajar en tu día de descanso, tócalo en la Agenda y elige "Abrir este día".'));
+        return;
+      }
+      lista.forEach(d => {
+        const chip = el('div', 'chip');
+        chip.append(icono('fa-solid fa-lock-open'), el('span', null, formatoFecha(d.fecha)));
+        const quitar = el('button', 'chip-btn');
+        quitar.type = 'button';
+        quitar.title = 'Volver a cerrar';
+        quitar.setAttribute('aria-label', `Volver a cerrar ${formatoFecha(d.fecha)}`);
+        quitar.appendChild(icono('fa-solid fa-xmark'));
+        quitar.addEventListener('click', async () => {
+          if (!confirm(`¿Volver a cerrar el ${formatoFechaLarga(d.fecha)}?`)) return;
+          try {
+            await Store.cerrarDia(d.barberoId, d.fecha);
+            avisar('Día cerrado otra vez.');
+          } catch (err) {
+            console.error(err);
+            avisar('No se pudo cerrar el día.', 'error');
+          }
+        });
+        chip.appendChild(quitar);
+        cont.appendChild(chip);
+      });
+    }
+
     async function quitarBloqueoDias(g) {
       const detalle = g.dias.length === 1 ? formatoFecha(g.desde) : `${g.dias.length} días (${formatoFecha(g.desde)} a ${formatoFecha(g.hasta)})`;
       if (!confirm(`¿Quitar el bloqueo de ${detalle}? Los clientes podrán volver a reservar.`)) return;
@@ -2330,6 +2418,48 @@
           avisar('No se pudo quitar el bloqueo.', 'error');
         }
       }));
+      card.append(info, acciones);
+      return card;
+    }
+
+    // Día de descanso fijo: el barbero puede abrirlo para trabajar ese día, o volver a cerrarlo.
+    function tarjetaDescansoFijo(fecha) {
+      const yo = estado.miBarberoId;
+      const abierto = diaAbierto(yo, fecha);
+      const horas = BARBEROS[yo].horarioDiaLibre;
+      const card = el('div', 'card card-descanso');
+      const info = el('div', 'card-info');
+      const h3 = el('h3');
+      h3.append(abierto ? 'Día de descanso abierto ' : 'Tu día de descanso ',
+        el('span', abierto ? 'badge badge-completada' : 'badge badge-bloqueada', abierto ? 'abierto' : 'descansas'));
+      info.append(h3, el('p', null, abierto
+        ? `Los clientes pueden reservar de ${formatoHora(horas[0])} a ${formatoHora(horas[horas.length - 1])}.`
+        : 'Los clientes no pueden reservar. Si vas a trabajar este día, ábrelo.'));
+
+      const acciones = el('div', 'card-actions');
+      const btn = el('button', 'action-btn', abierto ? 'Volver a cerrar' : 'Abrir este día');
+      btn.type = 'button';
+      btn.prepend(icono(abierto ? 'fa-solid fa-lock' : 'fa-solid fa-lock-open'), ' ');
+      btn.style.color = abierto ? 'var(--alerta)' : 'var(--ok)';
+      btn.addEventListener('click', async () => {
+        try {
+          if (abierto) {
+            const pendientes = estado.citas.filter(c => c.fecha === fecha && c.estado === 'pendiente').length;
+            const extra = pendientes ? ` Tienes ${pendientes} cita(s) pendiente(s) ese día: siguen en tu lista para que las canceles o avises.` : '';
+            if (!confirm(`¿Volver a cerrar el ${formatoFechaLarga(fecha)}?${extra}`)) return;
+            await Store.cerrarDia(yo, fecha);
+            avisar('Día cerrado otra vez.');
+          } else {
+            if (!confirm(`¿Abrir el ${formatoFechaLarga(fecha)} para que los clientes puedan reservar?`)) return;
+            await Store.abrirDia(yo, fecha);
+            avisar('Día abierto. Los clientes ya pueden reservar.');
+          }
+        } catch (err) {
+          console.error(err);
+          avisar('No se pudo cambiar el día. Inténtalo de nuevo.', 'error');
+        }
+      });
+      acciones.appendChild(btn);
       card.append(info, acciones);
       return card;
     }
@@ -2703,6 +2833,12 @@
       });
       Store.suscribirDiasBloqueados(lista => {
         estado.diasBloqueados = lista;
+        renderDiaStrip();
+        renderHorarios();
+        renderPanel();
+      });
+      Store.suscribirDiasAbiertos(lista => {
+        estado.diasAbiertos = lista;
         renderDiaStrip();
         renderHorarios();
         renderPanel();
