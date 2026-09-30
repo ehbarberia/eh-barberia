@@ -908,6 +908,22 @@
     </div>
   </dialog>
 
+  <!-- DIÁLOGO: INSTALAR EN ANDROID (cuando el celular no muestra la ventana automática) -->
+  <dialog id="dlg-android" aria-labelledby="dlg-android-titulo">
+    <h3 id="dlg-android-titulo">Instala la app en tu celular</h3>
+    <ol class="pasos-ios">
+      <li id="paso-abrir-chrome">Si abriste el link desde WhatsApp, Instagram o Facebook, toca el menú <b>⋮</b> y elige <b>Abrir en Chrome</b>.</li>
+      <li>En Chrome, toca el menú <b>⋮</b> (arriba a la derecha).</li>
+      <li>Elige <b>Instalar aplicación</b> o <b>Agregar a la pantalla principal</b>.</li>
+      <li>Toca <b>Instalar</b> y espera unos segundos.</li>
+    </ol>
+    <p class="hint">Si no aparece en la pantalla principal, búscala en el cajón de aplicaciones como "EH Barbería". En Xiaomi, Redmi o Poco, activa en Ajustes → Apps → Chrome → Permisos el permiso <b>Accesos directos en pantalla de inicio</b>.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-secondary" id="btn-android-cerrar">Cerrar</button>
+      <button type="button" class="btn" id="btn-android-listo">Ya la instalé</button>
+    </div>
+  </dialog>
+
   <!-- DIÁLOGO: YA TIENES UNA CITA -->
   <dialog id="dlg-otra-cita" aria-labelledby="dlg-otra-titulo">
     <h3 id="dlg-otra-titulo">Ya tienes una cita</h3>
@@ -2443,8 +2459,13 @@
        El botón se oculta cuando la app ya está instalada o abierta como app.
        ===================================================================== */
     let promptInstalacion = null;
-    const CLAVE_INSTALADA = 'eh_app_instalada';
-    const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    let instaladaDetectada = false;
+    // Clave nueva: ignora la marca que dejaba la versión anterior cuando la instalación no terminaba.
+    const CLAVE_INSTALADA = 'eh_app_instalada_v2';
+    const ua = navigator.userAgent;
+    const esIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const esAndroid = /android/i.test(ua);
+    const enNavegadorDeApp = /FBAN|FBAV|Instagram|Line\/|; wv\)/i.test(ua); // navegador interno de Facebook, Instagram, etc.
     const enModoApp = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
     function marcaInstalada(valor) {
@@ -2455,15 +2476,17 @@
       return false;
     }
 
+    // El botón sale en cualquier celular mientras la app no esté instalada.
+    // Solo se oculta cuando de verdad se instaló (o la persona confirma que ya la tiene).
     function actualizarBotonInstalar() {
-      const puede = !!promptInstalacion || esIOS;
-      $('btn-instalar').hidden = enModoApp() || marcaInstalada() || !puede;
+      const puede = !!promptInstalacion || esIOS || esAndroid;
+      $('btn-instalar').hidden = enModoApp() || instaladaDetectada || marcaInstalada() || !puede;
     }
 
     window.addEventListener('beforeinstallprompt', ev => {
       ev.preventDefault();
       promptInstalacion = ev;
-      marcaInstalada(false); // si Android ofrece instalar, es que no está instalada
+      marcaInstalada(false); // si el celular ofrece instalar, es que no está instalada
       actualizarBotonInstalar();
     });
 
@@ -2474,15 +2497,29 @@
       avisar('App instalada. Búscala con el logo de EH Barbería.');
     });
 
+    // En Android con Chrome, pregunta si la app ya está instalada en el celular.
+    function revisarSiYaEstaInstalada() {
+      if (!('getInstalledRelatedApps' in navigator)) return;
+      navigator.getInstalledRelatedApps()
+        .then(apps => { if (apps && apps.length) { instaladaDetectada = true; actualizarBotonInstalar(); } })
+        .catch(() => {});
+    }
+
     async function instalarApp() {
       if (promptInstalacion) {
-        promptInstalacion.prompt();
-        const { outcome } = await promptInstalacion.userChoice;
-        if (outcome === 'accepted') marcaInstalada(true);
-        promptInstalacion = null;
+        const evento = promptInstalacion;
+        promptInstalacion = null; // la ventana automática solo se puede usar una vez
+        evento.prompt();
+        const { outcome } = await evento.userChoice;
+        if (outcome === 'accepted') {
+          avisar('Instalando… en unos segundos aparece el ícono de EH Barbería.');
+        }
         actualizarBotonInstalar();
       } else if (esIOS) {
         $('dlg-ios').showModal();
+      } else {
+        $('paso-abrir-chrome').hidden = !enNavegadorDeApp && /chrome/i.test(ua) && !/SamsungBrowser/i.test(ua);
+        $('dlg-android').showModal();
       }
     }
 
@@ -2571,6 +2608,12 @@
 
       $('btn-instalar').addEventListener('click', instalarApp);
       $('btn-ios-cerrar').addEventListener('click', () => $('dlg-ios').close());
+      $('btn-android-cerrar').addEventListener('click', () => $('dlg-android').close());
+      $('btn-android-listo').addEventListener('click', () => {
+        marcaInstalada(true);
+        $('dlg-android').close();
+        actualizarBotonInstalar();
+      });
       $('btn-ios-listo').addEventListener('click', () => {
         marcaInstalada(true);
         $('dlg-ios').close();
@@ -2595,6 +2638,7 @@
       conectarEventos();
       registrarServiceWorker();
       actualizarBotonInstalar();
+      revisarSiYaEstaInstalada();
       preseleccionarBarbero();
       mostrarVista('cliente');
       actualizarReserva();
