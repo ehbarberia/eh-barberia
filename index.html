@@ -274,6 +274,10 @@
     .servicio-opcion > span b { font-weight: 600; }
     .servicio-opcion input:checked + span { background: var(--blanco); color: var(--negro); border-color: var(--blanco); }
     .servicio-opcion input:focus-visible + span { outline: 2px solid var(--blanco); outline-offset: 2px; }
+    .barberos-opciones { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+    .barberos-opciones .servicio-opcion > span { justify-content: center; font-family: var(--serif); font-size: 1.2rem; padding: 14px; }
+    .horario-barbero + .horario-barbero { margin-top: 1.6rem; }
+    .horario-barbero h3 { font-family: var(--serif); font-weight: 400; font-size: 1.25rem; margin-bottom: 0.7rem; }
 
     /* ---------- Tira de días ---------- */
     .dia-strip-wrap { position: relative; }
@@ -679,12 +683,13 @@
             <div class="confirmacion" id="confirmacion" role="status" hidden></div>
 
             <form id="form-reserva" novalidate>
-              <div class="form-group" id="grupo-barbero">
-                <label for="select-barbero"><i class="fa-solid fa-user" aria-hidden="true"></i> Barbero</label>
-                <select id="select-barbero" required>
+              <fieldset class="form-group" id="grupo-barbero" style="border: none;">
+                <legend class="etiqueta"><i class="fa-solid fa-user" aria-hidden="true"></i> Barbero</legend>
+                <div class="servicios-opciones barberos-opciones" id="barberos-opciones"></div>
+                <select id="select-barbero" hidden aria-hidden="true" tabindex="-1">
                   <option value="">Selecciona un barbero</option>
                 </select>
-              </div>
+              </fieldset>
 
               <fieldset class="form-group" style="border: none;">
                 <legend class="etiqueta"><i class="fa-solid fa-scissors" aria-hidden="true"></i> Servicio</legend>
@@ -698,7 +703,7 @@
                 <div class="dia-strip-wrap">
                   <button type="button" class="dia-flecha dia-flecha-izq" id="dias-prev" aria-label="Ver días anteriores" hidden>‹</button>
                   <div class="dia-strip" id="dia-strip" role="group" aria-labelledby="lbl-dias">
-                    <p class="empty-msg">Selecciona un barbero para ver los días disponibles.</p>
+                    <p class="hint">Elige primero con quién quieres tu cita.</p>
                   </div>
                   <button type="button" class="dia-flecha dia-flecha-der" id="dias-next" aria-label="Ver más días" hidden>›</button>
                 </div>
@@ -748,7 +753,7 @@
 
       <!-- HORARIO -->
       <h2>Horario</h2>
-      <div class="tablero" id="lista-horario"></div>
+      <div id="lista-horario"></div>
       <p class="hint" style="margin-top: 0.9rem;">La hora final de cada día es el último turno que puedes reservar.</p>
 
       <!-- OTROS SERVICIOS -->
@@ -1009,8 +1014,16 @@
     const EIMER_DOMINGO = ["07:30","08:00","08:30","09:00","09:20","09:40","10:00","10:20","10:40","11:00","11:30",
       "13:00","13:30","14:00","14:20","14:45","15:10","15:35","16:00","16:25","16:45","17:10","17:35","18:00","18:20"];
 
+    // Horarios de Adrián.
+    const ADRIAN_ENTRE_SEMANA = ["10:00","10:30","11:00","11:30",
+      "13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"];
+    const ADRIAN_SABADO = ["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
+      "13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00"];
+    const ADRIAN_DOMINGO = ["08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
+      "13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00"];
+
     // Barberos. horario: 0=domingo … 6=sábado; null = no trabaja ese día.
-    // El barbero 2 queda apagado (activo: false) hasta tener su nombre y horario.
+    // Eimer descansa los miércoles; Adrián, los martes.
     const BARBEROS = {
       barbero_1: {
         nombre: "Eimer",
@@ -1018,12 +1031,11 @@
         horario: { 0: EIMER_DOMINGO, 1: EIMER_ENTRE_SEMANA, 2: EIMER_ENTRE_SEMANA, 3: null, 4: EIMER_ENTRE_SEMANA, 5: EIMER_ENTRE_SEMANA, 6: EIMER_SABADO }
       },
       barbero_2: {
-        nombre: "Barbero 2",
-        activo: false,
-        horario: {}
+        nombre: "Adrián",
+        activo: true,
+        horario: { 0: ADRIAN_DOMINGO, 1: ADRIAN_ENTRE_SEMANA, 2: null, 3: ADRIAN_ENTRE_SEMANA, 4: ADRIAN_ENTRE_SEMANA, 5: ADRIAN_ENTRE_SEMANA, 6: ADRIAN_SABADO }
       }
     };
-    const BARBERO_HORARIO_PUBLICO = "barbero_1"; // de quién se toma el horario que ven los clientes
 
     const ESTADOS = ["pendiente", "completada", "cancelada", "bloqueada"];
 
@@ -1453,7 +1465,11 @@
     function preseleccionarBarbero() {
       const activos = barberosActivos();
       $('grupo-barbero').hidden = activos.length <= 1;
-      if (activos.length === 1) $('select-barbero').value = activos[0];
+      if (activos.length === 1) {
+        $('select-barbero').value = activos[0];
+        const r = document.querySelector(`input[name="barbero"][value="${activos[0]}"]`);
+        if (r) r.checked = true;
+      }
     }
 
     function servicioElegido() {
@@ -1630,11 +1646,24 @@
        ===================================================================== */
     function poblarBarberos() {
       const sel = $('select-barbero');
+      const cont = $('barberos-opciones');
       barberosActivos().forEach(id => {
         const op = document.createElement('option');
         op.value = id;
         op.textContent = BARBEROS[id].nombre;
         sel.appendChild(op);
+
+        const lab = el('label', 'servicio-opcion');
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'barbero';
+        input.value = id;
+        input.addEventListener('change', () => {
+          sel.value = id;
+          sel.dispatchEvent(new Event('change'));
+        });
+        lab.append(input, el('span', null, BARBEROS[id].nombre));
+        cont.appendChild(lab);
       });
     }
 
@@ -1668,12 +1697,19 @@
 
       const hor = $('lista-horario');
       const nombres = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-      const h = horarioDe(BARBERO_HORARIO_PUBLICO);
-      [1, 2, 3, 4, 5, 6, 0].forEach(d => {
-        const horas = h[d] || [];
-        hor.appendChild(horas.length
-          ? filaTablero(nombres[d], `${formatoHora(horas[0])} a ${formatoHora(horas[horas.length - 1])}`)
-          : filaTablero(nombres[d], 'Cerrado', 'cerrado'));
+      barberosActivos().forEach(id => {
+        const bloque = el('div', 'horario-barbero');
+        bloque.appendChild(el('h3', null, BARBEROS[id].nombre));
+        const tabla = el('div', 'tablero');
+        const h = horarioDe(id);
+        [1, 2, 3, 4, 5, 6, 0].forEach(d => {
+          const horas = h[d] || [];
+          tabla.appendChild(horas.length
+            ? filaTablero(nombres[d], `${formatoHora(horas[0])} a ${formatoHora(horas[horas.length - 1])}`)
+            : filaTablero(nombres[d], 'Descansa', 'cerrado'));
+        });
+        bloque.appendChild(tabla);
+        hor.appendChild(bloque);
       });
 
       const prod = $('lista-productos');
@@ -1728,7 +1764,7 @@
       cont.replaceChildren();
 
       if (!barberoId) {
-        cont.appendChild(el('p', 'empty-msg', 'Selecciona un barbero para ver los días disponibles.'));
+        cont.appendChild(el('p', 'hint', 'Elige primero con quién quieres tu cita.'));
         $('dias-prev').hidden = true;
         $('dias-next').hidden = true;
         return;
