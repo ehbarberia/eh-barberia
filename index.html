@@ -1252,7 +1252,10 @@
         // Público y sin datos personales: solo barbero, fecha y hora.
         suscribirOcupados(cb) {
           const { fs, db } = fb;
-          const q = fs.query(fs.collection(db, 'horarios'), fs.where('fecha', '>=', fechaLocal()));
+          // Solo los días que se pueden reservar (no los 45 días de turnos fijos ya creados).
+          const hoy = fechaLocal();
+          const q = fs.query(fs.collection(db, 'horarios'),
+            fs.where('fecha', '>=', hoy), fs.where('fecha', '<=', sumarDias(hoy, DIAS_PARA_RESERVAR)));
           // includeMetadataChanges: avisa si los datos vienen del servidor o de la memoria
           // del celular (por ejemplo, al volver a la pestaña después de un rato).
           return fs.onSnapshot(q, { includeMetadataChanges: true },
@@ -1490,11 +1493,26 @@
     function actualizarPanelReserva() {
       $('reserva-contenido').hidden = !estado.reservaAbierta;
       $('btn-reserva-toggle').setAttribute('aria-expanded', String(estado.reservaAbierta));
+      asegurarDisponibilidad();
     }
 
     function alternarPanelReserva() {
       estado.reservaAbierta = !estado.reservaAbierta;
       actualizarPanelReserva();
+    }
+
+    // La disponibilidad se carga solo cuando alguien abre "Reservar cita"
+    // (así una visita que solo mira la página no gasta lecturas de Firestore).
+    let disponibilidadActiva = false;
+    function asegurarDisponibilidad() {
+      if (disponibilidadActiva || !estado.listo || !estado.reservaAbierta) return;
+      disponibilidadActiva = true;
+      Store.suscribirOcupados((lista, delServidor) => {
+        estado.ocupados = lista;
+        estado.ocupadosAlDia = delServidor;
+        renderDiaStrip();
+        renderHorarios();
+      });
     }
 
     function alternarClientes() {
@@ -2825,12 +2843,7 @@
       }
       estado.listo = true;
 
-      Store.suscribirOcupados((lista, delServidor) => {
-        estado.ocupados = lista;
-        estado.ocupadosAlDia = delServidor;
-        renderDiaStrip();
-        renderHorarios();
-      });
+      asegurarDisponibilidad();
       Store.suscribirDiasBloqueados(lista => {
         estado.diasBloqueados = lista;
         renderDiaStrip();
