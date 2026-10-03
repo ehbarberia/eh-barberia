@@ -754,7 +754,7 @@
       <!-- HORARIO -->
       <h2>Horario</h2>
       <div id="lista-horario"></div>
-      <p class="hint" style="margin-top: 0.9rem;">La hora final de cada día es el último turno que puedes reservar.</p>
+      <p class="hint" style="margin-top: 0.9rem;">La hora final de cada día es el último turno que puedes reservar. Los festivos no atendemos, salvo que el barbero lo habilite (si es así, aparece disponible al reservar).</p>
 
       <!-- OTROS SERVICIOS -->
       <h2>Otros servicios</h2>
@@ -843,7 +843,7 @@
         </div>
         <p class="hint" style="margin: 1rem 0 0.6rem;">Días de descanso próximos</p>
         <div class="chips" id="lista-dias-bloqueados"></div>
-        <p class="hint" style="margin: 1rem 0 0.6rem;">Días de descanso que abriste para trabajar</p>
+        <p class="hint" style="margin: 1rem 0 0.6rem;">Festivos y días de descanso que habilitaste para trabajar</p>
         <div class="chips" id="lista-dias-abiertos"></div>
       </div>
 
@@ -1029,12 +1029,14 @@
     const BARBEROS = {
       barbero_1: {
         nombre: "Eimer",
+        whatsapp: "573137698032",
         activo: true,
         horarioDiaLibre: EIMER_ENTRE_SEMANA, // si abre su miércoles de descanso, atiende con este horario
         horario: { 0: EIMER_DOMINGO, 1: EIMER_ENTRE_SEMANA, 2: EIMER_ENTRE_SEMANA, 3: null, 4: EIMER_ENTRE_SEMANA, 5: EIMER_ENTRE_SEMANA, 6: EIMER_SABADO }
       },
       barbero_2: {
         nombre: "Adrián",
+        whatsapp: "573146401006",
         activo: true,
         horarioDiaLibre: ADRIAN_ENTRE_SEMANA, // si abre su martes de descanso, atiende con este horario
         horario: { 0: ADRIAN_DOMINGO, 1: ADRIAN_ENTRE_SEMANA, 2: null, 3: ADRIAN_ENTRE_SEMANA, 4: ADRIAN_ENTRE_SEMANA, 5: ADRIAN_ENTRE_SEMANA, 6: ADRIAN_SABADO }
@@ -1070,6 +1072,59 @@
 
     const horarioDe = barberoId => (BARBEROS[barberoId] && BARBEROS[barberoId].horario) || {};
 
+    // FESTIVOS DE COLOMBIA: se calculan solos para cualquier año (Ley Emiliani incluida).
+    // Si algún año el Gobierno cambia uno, agrégalo o quítalo en FESTIVOS_AJUSTES.
+    const FESTIVOS_AJUSTES = {
+      // 'AAAA-MM-DD': 'Nombre',   // agrega un festivo
+      // 'AAAA-MM-DD': null,       // quita un festivo
+    };
+    const cacheFestivos = {};
+
+    function domingoDePascua(y) {
+      const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+      const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+      const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+      const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+      return Date.UTC(y, mes - 1, dia);
+    }
+
+    function festivosDelAnio(y) {
+      if (cacheFestivos[y]) return cacheFestivos[y];
+      const f = {};
+      const iso = t => new Date(t).toISOString().slice(0, 10);
+      const DIA = 86400000;
+      const fijo = (m, d, n) => { f[iso(Date.UTC(y, m - 1, d))] = n; };
+      const alLunes = (t, n) => { const dow = new Date(t).getUTCDay(); f[iso(t + ((8 - dow) % 7) * DIA)] = n; };
+      fijo(1, 1, 'Año Nuevo');
+      fijo(5, 1, 'Día del Trabajo');
+      fijo(7, 20, 'Día de la Independencia');
+      fijo(8, 7, 'Batalla de Boyacá');
+      fijo(12, 8, 'Inmaculada Concepción');
+      fijo(12, 25, 'Navidad');
+      alLunes(Date.UTC(y, 0, 6), 'Reyes Magos');
+      alLunes(Date.UTC(y, 2, 19), 'San José');
+      alLunes(Date.UTC(y, 5, 29), 'San Pedro y San Pablo');
+      alLunes(Date.UTC(y, 7, 15), 'Asunción de la Virgen');
+      alLunes(Date.UTC(y, 9, 12), 'Día de la Raza');
+      alLunes(Date.UTC(y, 10, 1), 'Todos los Santos');
+      alLunes(Date.UTC(y, 10, 11), 'Independencia de Cartagena');
+      const p = domingoDePascua(y);
+      f[iso(p - 3 * DIA)] = 'Jueves Santo';
+      f[iso(p - 2 * DIA)] = 'Viernes Santo';
+      alLunes(p + 39 * DIA, 'Ascensión del Señor');
+      alLunes(p + 60 * DIA, 'Corpus Christi');
+      alLunes(p + 68 * DIA, 'Sagrado Corazón');
+      Object.keys(FESTIVOS_AJUSTES).forEach(k => {
+        if (k.slice(0, 4) !== String(y)) return;
+        if (FESTIVOS_AJUSTES[k]) f[k] = FESTIVOS_AJUSTES[k]; else delete f[k];
+      });
+      cacheFestivos[y] = f;
+      return f;
+    }
+
+    // Nombre del festivo de esa fecha (AAAA-MM-DD), o null si no es festivo.
+    const nombreFestivo = fecha => (fecha ? festivosDelAnio(Number(fecha.slice(0, 4)))[fecha] || null : null);
+
     // Día de descanso fijo del barbero (ej. Eimer los miércoles, Adrián los martes).
     function esDescansoFijo(barberoId, fecha) {
       if (!barberoId || !fecha) return false;
@@ -1081,9 +1136,20 @@
     const diaAbierto = (barberoId, fecha) =>
       estado.diasAbiertos.some(d => d.barberoId === barberoId && d.fecha === fecha);
 
+    // Festivo que el barbero NO ha habilitado: cerrado para reservas.
+    const festivoCerrado = (barberoId, fecha) => !!nombreFestivo(fecha) && !diaAbierto(barberoId, fecha);
+
+    // Horas que tendría ese día si el barbero lo habilita (festivo o día de descanso).
+    function horasSiSeHabilita(barberoId, fecha) {
+      const dia = new Date(fecha + 'T12:00:00').getDay();
+      const normal = horarioDe(barberoId)[dia] || [];
+      return (normal.length ? normal : ((BARBEROS[barberoId] || {}).horarioDiaLibre || [])).slice();
+    }
+
     // Turnos de ese barbero en esa fecha. [] si no trabaja.
     function horasDelDia(barberoId, fecha) {
       if (!barberoId || !fecha) return [];
+      if (festivoCerrado(barberoId, fecha)) return [];
       const dia = new Date(fecha + 'T12:00:00').getDay();
       const normal = horarioDe(barberoId)[dia] || [];
       if (normal.length) return normal.slice();
@@ -1804,7 +1870,9 @@
         a.append(icono(clasesIcono), texto);
         redes.appendChild(a);
       };
-      enlace(`https://wa.me/${NEGOCIO.whatsapp}`, 'fa-brands fa-whatsapp', 'Escríbenos por WhatsApp', true);
+      barberosActivos().forEach(id => {
+        if (BARBEROS[id].whatsapp) enlace(`https://wa.me/${BARBEROS[id].whatsapp}`, 'fa-brands fa-whatsapp', `WhatsApp ${BARBEROS[id].nombre}`, true);
+      });
       if (NEGOCIO.instagram) enlace(NEGOCIO.instagram, 'fa-brands fa-instagram', 'Instagram');
       if (NEGOCIO.facebook) enlace(NEGOCIO.facebook, 'fa-brands fa-facebook', 'Facebook');
     }
@@ -1850,7 +1918,7 @@
         btn.type = 'button';
         btn.disabled = cerrado || sinCupos;
         btn.dataset.fecha = fecha;
-        const estadoTexto = cerrado ? 'Cerrado' : sinCupos ? 'Lleno' : `${libres} libre${libres === 1 ? '' : 's'}`;
+        const estadoTexto = festivoCerrado(barberoId, fecha) ? 'Festivo' : cerrado ? 'Cerrado' : sinCupos ? 'Lleno' : `${libres} libre${libres === 1 ? '' : 's'}`;
         btn.setAttribute('aria-label', `${formatoFechaLarga(fecha)}, ${estadoTexto}`);
         btn.append(
           el('span', 'dia-card-abrev', i === 0 ? 'Hoy' : DIAS_ABREV[d.getDay()]),
@@ -1892,6 +1960,7 @@
         return;
       }
 
+      if (festivoCerrado(barberoId, fecha)) return sinHoras(`Ese día es festivo (${nombreFestivo(fecha)}) y no atendemos. Elige otra fecha.`);
       const horas = horasDelDia(barberoId, fecha);
       if (horas.length === 0) return sinHoras('Ese día no atendemos. Elige otra fecha.');
       if (diaBloqueado(barberoId, fecha)) return sinHoras(`${nombreBarbero(barberoId)} no atiende ese día. Elige otra fecha.`);
@@ -2245,6 +2314,7 @@
         const fecha = sumarDias(hoy, i);
         const d = new Date(fecha + 'T12:00:00');
         const cerrado = horasDelDia(yo, fecha).length === 0;
+        const festivo = festivoCerrado(yo, fecha);
         const descansoFijo = cerrado && esDescansoFijo(yo, fecha);
         const descanso = !cerrado && diaBloqueado(yo, fecha);
         const n = porFecha[fecha] || 0;
@@ -2259,7 +2329,7 @@
         btn.append(
           el('span', 'dia-card-abrev', i === 0 ? 'Hoy' : DIAS_ABREV[d.getDay()]),
           el('span', 'dia-card-num', String(d.getDate())),
-          el('span', 'dia-card-estado', descansoFijo ? 'Descansas' : cerrado ? 'Cerrado' : descanso ? 'Descanso' : `${n} cita${n === 1 ? '' : 's'}`)
+          el('span', 'dia-card-estado', festivo ? 'Festivo' : descansoFijo ? 'Descansas' : cerrado ? 'Cerrado' : descanso ? 'Descanso' : `${n} cita${n === 1 ? '' : 's'}`)
         );
         btn.addEventListener('click', () => {
           $('filtro-fecha-barbero').value = fecha;
@@ -2315,7 +2385,7 @@
       let tarjetaDescanso = null;
       if (estado.modo === 'dia') {
         const fecha = $('filtro-fecha-barbero').value || hoy;
-        if (esDescansoFijo(estado.miBarberoId, fecha) && fecha >= hoy) {
+        if ((esDescansoFijo(estado.miBarberoId, fecha) || nombreFestivo(fecha)) && fecha >= hoy) {
           tarjetaDescanso = tarjetaDescansoFijo(fecha);
           cont.appendChild(tarjetaDescanso);
         }
@@ -2381,12 +2451,12 @@
         .sort((a, b) => a.fecha.localeCompare(b.fecha));
 
       if (lista.length === 0) {
-        cont.appendChild(el('p', 'hint', 'Para trabajar en tu día de descanso, tócalo en la Agenda y elige "Abrir este día".'));
+        cont.appendChild(el('p', 'hint', 'Para trabajar un festivo o tu día de descanso, tócalo en la Agenda y elige "Habilitar este día".'));
         return;
       }
       lista.forEach(d => {
         const chip = el('div', 'chip');
-        chip.append(icono('fa-solid fa-lock-open'), el('span', null, formatoFecha(d.fecha)));
+        chip.append(icono('fa-solid fa-lock-open'), el('span', null, formatoFecha(d.fecha) + (nombreFestivo(d.fecha) ? ' (festivo)' : '')));
         const quitar = el('button', 'chip-btn');
         quitar.type = 'button';
         quitar.title = 'Volver a cerrar';
@@ -2440,37 +2510,43 @@
       return card;
     }
 
-    // Día de descanso fijo: el barbero puede abrirlo para trabajar ese día, o volver a cerrarlo.
+    // Festivo o día de descanso fijo: el barbero puede habilitarlo para trabajar, o volver a cerrarlo.
     function tarjetaDescansoFijo(fecha) {
       const yo = estado.miBarberoId;
       const abierto = diaAbierto(yo, fecha);
-      const horas = BARBEROS[yo].horarioDiaLibre;
+      const festivo = nombreFestivo(fecha);
+      const horas = horasSiSeHabilita(yo, fecha);
       const card = el('div', 'card card-descanso');
       const info = el('div', 'card-info');
       const h3 = el('h3');
-      h3.append(abierto ? 'Día de descanso abierto ' : 'Tu día de descanso ',
-        el('span', abierto ? 'badge badge-completada' : 'badge badge-bloqueada', abierto ? 'abierto' : 'descansas'));
+      const titulo = festivo
+        ? (abierto ? `Festivo habilitado: ${festivo} ` : `Festivo: ${festivo} `)
+        : (abierto ? 'Día de descanso habilitado ' : 'Tu día de descanso ');
+      h3.append(titulo, el('span', abierto ? 'badge badge-completada' : 'badge badge-bloqueada',
+        abierto ? 'habilitado' : festivo ? 'festivo' : 'descansas'));
       info.append(h3, el('p', null, abierto
         ? `Los clientes pueden reservar de ${formatoHora(horas[0])} a ${formatoHora(horas[horas.length - 1])}.`
-        : 'Los clientes no pueden reservar. Si vas a trabajar este día, ábrelo.'));
+        : 'Los clientes no pueden reservar. Si vas a trabajar este día, habilítalo.'));
 
       const acciones = el('div', 'card-actions');
-      const btn = el('button', 'action-btn', abierto ? 'Volver a cerrar' : 'Abrir este día');
+      const btn = el('button', 'action-btn', abierto ? 'Volver a cerrar' : 'Habilitar este día');
       btn.type = 'button';
       btn.prepend(icono(abierto ? 'fa-solid fa-lock' : 'fa-solid fa-lock-open'), ' ');
       btn.style.color = abierto ? 'var(--alerta)' : 'var(--ok)';
       btn.addEventListener('click', async () => {
         try {
           if (abierto) {
-            const pendientes = estado.citas.filter(c => c.fecha === fecha && c.estado === 'pendiente').length;
-            const extra = pendientes ? ` Tienes ${pendientes} cita(s) pendiente(s) ese día: siguen en tu lista para que las canceles o avises.` : '';
+            // Las citas fijas de un festivo se quitan solas al cerrarlo; las de clientes no.
+            const pendientes = estado.citas.filter(c => c.fecha === fecha && c.estado === 'pendiente' && !(festivo && c.tipo === 'fijo')).length;
+            const extra = (pendientes ? ` Tienes ${pendientes} cita(s) de clientes ese día: siguen en tu lista para que las canceles o avises.` : '')
+              + (festivo ? ' Tus citas fijas de ese día se quitan solas en unos minutos.' : '');
             if (!confirm(`¿Volver a cerrar el ${formatoFechaLarga(fecha)}?${extra}`)) return;
             await Store.cerrarDia(yo, fecha);
             avisar('Día cerrado otra vez.');
           } else {
-            if (!confirm(`¿Abrir el ${formatoFechaLarga(fecha)} para que los clientes puedan reservar?`)) return;
+            if (!confirm(`¿Habilitar el ${formatoFechaLarga(fecha)} para que los clientes puedan reservar?`)) return;
             await Store.abrirDia(yo, fecha);
-            avisar('Día abierto. Los clientes ya pueden reservar.');
+            avisar(festivo ? 'Festivo habilitado. Tus turnos fijos de ese día se agregan en unos minutos.' : 'Día habilitado. Los clientes ya pueden reservar.');
           }
         } catch (err) {
           console.error(err);
