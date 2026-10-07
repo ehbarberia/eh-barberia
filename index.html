@@ -1009,8 +1009,12 @@
     ];
 
     // Horarios de Eimer: la lista exacta de turnos de cada día (hora de 24 h).
-    const EIMER_ENTRE_SEMANA = ["10:00","10:25","10:45","11:10","11:35",
-      "13:20","14:10","14:35","15:00","15:25","15:40","16:10","16:40","17:10","17:35","18:00","18:25","18:45","19:10","19:30","19:50"];
+    // Entre semana la mañana y la tarde (desde las 3:00) son iguales; cambia el bloque de 1 a 3 p. m.
+    const EIMER_MANANA = ["10:00","10:25","10:45","11:10","11:35"];
+    const EIMER_TARDE = ["15:00","15:25","15:40","16:10","16:40","17:10","17:35","18:00","18:25","18:45","19:10","19:30","19:50"];
+    const EIMER_LUNES = [...EIMER_MANANA, "13:20","14:00","14:20","14:40", ...EIMER_TARDE];
+    const EIMER_MARTES_JUEVES = [...EIMER_MANANA, "13:20","13:45","14:05","14:30", ...EIMER_TARDE];
+    const EIMER_VIERNES = [...EIMER_MANANA, "13:00","13:25","13:45","14:05","14:35", ...EIMER_TARDE];
     const EIMER_SABADO = ["07:00","07:30","08:00","08:30","09:00","09:25","09:50","10:15","10:45","11:05","11:30",
       "12:40","13:00","13:20","13:50","14:15","14:45","15:10","15:35","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00"];
     const EIMER_DOMINGO = ["07:30","08:00","08:30","09:00","09:20","09:40","10:00","10:20","10:40","11:00","11:30",
@@ -1031,8 +1035,8 @@
         nombre: "Eimer",
         whatsapp: "573137698032",
         activo: true,
-        horarioDiaLibre: EIMER_ENTRE_SEMANA, // si abre su miércoles de descanso, atiende con este horario
-        horario: { 0: EIMER_DOMINGO, 1: EIMER_ENTRE_SEMANA, 2: EIMER_ENTRE_SEMANA, 3: null, 4: EIMER_ENTRE_SEMANA, 5: EIMER_ENTRE_SEMANA, 6: EIMER_SABADO }
+        horarioDiaLibre: EIMER_LUNES, // si abre su miércoles de descanso, atiende con este horario
+        horario: { 0: EIMER_DOMINGO, 1: EIMER_LUNES, 2: EIMER_MARTES_JUEVES, 3: null, 4: EIMER_MARTES_JUEVES, 5: EIMER_VIERNES, 6: EIMER_SABADO }
       },
       barbero_2: {
         nombre: "Adrián",
